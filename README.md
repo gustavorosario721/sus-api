@@ -117,6 +117,10 @@ Todas as variáveis abaixo são opcionais para consultas públicas. Só crie um 
 
 Não compartilhe nem comite `.env`.
 
+## Autenticação Google
+
+O login Google é integrado exclusivamente pelo Supabase Auth. A aplicação usa OAuth 2.0 por `signInWithOAuth`; o Client Secret permanece configurado no provedor Google do Supabase. Consulte `docs/GOOGLE-OAUTH-SUPABASE.md` para configurar origens, callback e URLs de redirecionamento.
+
 ## Supabase
 
 **Sem Supabase configurado, o sistema continua abrindo e as consultas públicas continuam disponíveis.** Nesse modo, autenticação, favoritos, filtros salvos, histórico entre sessões e cache/logs persistentes ficam indisponíveis; o cache em memória continua sendo usado temporariamente. A interface informa que a conta não está conectada, em vez de interromper as consultas públicas.
