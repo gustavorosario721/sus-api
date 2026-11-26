@@ -9,7 +9,6 @@ import {
   Users, X
 } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
-import { GoogleFacilityMap, GoogleEpidemiologyMap, GoogleMapsSetupNotice, googleMapsConfigured } from './GoogleMaps.jsx';
 import L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.heat';
@@ -633,7 +632,6 @@ function FacilityMap({ rows, full = false, user, onOpenAuth, filters = {}, mapVi
   const [showHeat, setShowHeat] = useState(false);
   const [mapView, setMapView] = useState({ center_lat: -14.2, center_lng: -51.9, zoom: 4 });
   const [mapSaveMessage, setMapSaveMessage] = useState('');
-  const [initialMapView, setInitialMapView] = useState(null);
   const [facilitySearch, setFacilitySearch] = useState('');
   const frameRef = useRef(null);
   const allPoints = useMemo(() => rows.map(facilityPoint).filter(Boolean), [rows]);
@@ -646,18 +644,6 @@ function FacilityMap({ rows, full = false, user, onOpenAuth, filters = {}, mapVi
   const points = useMemo(() => matchingPoints.slice(0, 1500), [matchingPoints]);
   const captureMapView = useCallback(view => setMapView(view), []);
   const restoreLayers = useCallback(layers => setShowHeat(Boolean(layers?.find(layer => layer.key === 'facility-density')?.enabled)), []);
-  useEffect(() => {
-    let active = true;
-    if (!user?.id || !supabase) return () => { active = false; };
-    let query = supabase.from('saved_map_views').select('center_lat,center_lng,zoom,layers').eq('user_id', user.id);
-    query = mapViewId ? query.eq('id', mapViewId) : query.order('created_at', { ascending: false }).limit(1);
-    query.maybeSingle().then(({ data }) => {
-      if (!active || !data || !Number.isFinite(Number(data.center_lat)) || !Number.isFinite(Number(data.center_lng))) return;
-      setInitialMapView({ center_lat: Number(data.center_lat), center_lng: Number(data.center_lng), zoom: Number(data.zoom) || 4 });
-      restoreLayers(data.layers || []);
-    });
-    return () => { active = false; };
-  }, [user?.id, mapViewId, restoreLayers]);
   const saveMapView = async () => {
     if (!user) { onOpenAuth?.(); return; }
     if (!supabase) { setMapSaveMessage('Salvar visualizações exige uma conta conectada ao Supabase. O mapa continua disponível.'); return; }
@@ -682,7 +668,6 @@ function FacilityMap({ rows, full = false, user, onOpenAuth, filters = {}, mapVi
   </MapContainer>;
   const missingCoordinates = Math.max(0, rows.length - allPoints.length);
   return <>
-    <GoogleMapsSetupNotice />
     <div className="map-command-strip">
       <label className="map-command-search"><Search size={17} /><input value={facilitySearch} onChange={event => setFacilitySearch(event.target.value)} placeholder="Buscar unidade, município, tipo ou CNES…" aria-label="Buscar estabelecimento no mapa" />{facilitySearch && <button type="button" onClick={() => setFacilitySearch('')} aria-label="Limpar busca"><X size={15} /></button>}</label>
       <div className="map-command-stats" aria-live="polite">
@@ -691,8 +676,8 @@ function FacilityMap({ rows, full = false, user, onOpenAuth, filters = {}, mapVi
         <span><b>{formatNumber(missingCoordinates)}</b><small>sem coordenadas</small></span>
       </div>
     </div>
-    <div ref={frameRef} className={`map-frame map-frame-immersive ${full ? 'map-frame-full' : ''} ${googleMapsConfigured ? 'map-frame-google' : ''}`}>
-      <GoogleFacilityMap points={points} selectedId={selectedId} onSelectPoint={onSelectPoint} onViewChange={captureMapView} initialView={initialMapView} showDensity={showHeat} fallback={fallbackMap} />
+    <div ref={frameRef} className={`map-frame map-frame-immersive ${full ? 'map-frame-full' : ''}`}>
+      {fallbackMap}
       <div className="map-toolbar">
         <label><input type="checkbox" checked={showHeat} onChange={event => setShowHeat(event.target.checked)} /> Concentração de unidades</label>
         <div><button type="button" onClick={saveMapView}>Salvar vista</button><button type="button" onClick={() => frameRef.current?.requestFullscreen?.()}>Tela cheia</button></div>
@@ -802,20 +787,8 @@ function EpidemiologicalMap({ rows, indicatorLabel = 'Registros agregados' }) {
     <div className="map-result-heading"><span><MapPinned size={16} /> Distribuição territorial {showMunicipalities ? 'por município' : 'por UF'}</span><div className="map-layer-toggles"><label><input type="checkbox" checked={showMunicipalities} onChange={event => setShowMunicipalities(event.target.checked)} disabled={!municipalityTotals.size} /> Municípios (até 25 da página)</label><label><input type="checkbox" checked={showHeat} onChange={event => setShowHeat(event.target.checked)} disabled={showMunicipalities} /> Intensidade agregada</label></div></div>
       {geoError && <div className="methodology-warning"><AlertCircle size={16} /> Não foi possível carregar as malhas territoriais do IBGE: {geoError}</div>}
     {showMunicipalities && !municipalityGeojson && selectedMunicipalityCodes.length > 0 && <Loading label="Carregando malhas dos municípios da página…" />}
-    {googleMapsConfigured ? <GoogleEpidemiologyMap
-      geojson={geojson}
-      municipalityGeojson={municipalityGeojson}
-      showMunicipalities={showMunicipalities}
-      showIntensity={showHeat}
-      totals={totals}
-      municipalityTotals={municipalityTotals}
-      indicatorLabel={indicatorLabel}
-      fallback={activeGeojson?.features ? <div className="map-frame epidemiology-map-frame"><MapContainer center={[-14.2, -51.9]} zoom={showMunicipalities ? 5 : 4} minZoom={3} maxZoom={12} scrollWheelZoom preferCanvas><TileLayer attribution='Malhas territoriais: IBGE · &copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />{showMunicipalities ? <GeoJSON data={municipalityGeojson} style={municipalStyle} onEachFeature={onEachMunicipality} /> : <><GeoJSON data={geojson} style={styleFeature} onEachFeature={onEachFeature} /><StateHeatLayer features={geojson.features} totals={totals} maxValue={maxValue} enabled={showHeat} /></>}</MapContainer></div> : null}
-    /> : <>
-      <GoogleMapsSetupNotice />
-      {activeGeojson?.features && <div className="map-frame epidemiology-map-frame"><MapContainer center={[-14.2, -51.9]} zoom={showMunicipalities ? 5 : 4} minZoom={3} maxZoom={12} scrollWheelZoom preferCanvas><TileLayer attribution='Malhas territoriais: IBGE · &copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />{showMunicipalities ? <GeoJSON data={municipalityGeojson} style={municipalStyle} onEachFeature={onEachMunicipality} /> : <><GeoJSON data={geojson} style={styleFeature} onEachFeature={onEachFeature} /><StateHeatLayer features={geojson.features} totals={totals} maxValue={maxValue} enabled={showHeat} /></>}</MapContainer></div>}
-    </>}
-    <div className="map-attribution-note">Dados epidemiológicos agregados. {showMunicipalities ? `Mapa limitado aos ${selectedMunicipalityCodes.length} municípios com maiores contagens na página atual; a paginação e os filtros alteram essa seleção.` : 'O mapa estadual agrega municípios por UF.'} Nenhum polígono ou centroide representa localização individual de pacientes. Fonte dos limites territoriais: IBGE; base cartográfica: {googleMapsConfigured ? 'Google Maps' : 'OpenStreetMap'}. Valores referem-se somente à página consultada.</div>
+    {activeGeojson?.features && <div className="map-frame epidemiology-map-frame"><MapContainer center={[-14.2, -51.9]} zoom={showMunicipalities ? 5 : 4} minZoom={3} maxZoom={12} scrollWheelZoom preferCanvas><TileLayer attribution='Malhas territoriais: IBGE · &copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />{showMunicipalities ? <GeoJSON data={municipalityGeojson} style={municipalStyle} onEachFeature={onEachMunicipality} /> : <><GeoJSON data={geojson} style={styleFeature} onEachFeature={onEachFeature} /><StateHeatLayer features={geojson.features} totals={totals} maxValue={maxValue} enabled={showHeat} /></>}</MapContainer></div>}
+    <div className="map-attribution-note">Dados epidemiológicos agregados. {showMunicipalities ? `Mapa limitado aos ${selectedMunicipalityCodes.length} municípios com maiores contagens na página atual; a paginação e os filtros alteram essa seleção.` : 'O mapa estadual agrega municípios por UF.'} Nenhum polígono ou centroide representa localização individual de pacientes. Fonte dos limites territoriais: IBGE; base cartográfica: OpenStreetMap. Valores referem-se somente à página consultada.</div>
     {!rows.length && <div className="empty-state"><Activity size={20} /><b>Consulte uma base epidemiológica para gerar a camada</b></div>}
   </section>;
 }
@@ -1028,7 +1001,7 @@ function ResourceExplorer({ initialResource, allowedResources, user, onOpenAuth,
       {immersiveMap && <section className="map-stage-section" aria-label="Explorador geográfico de estabelecimentos">
         <div className="map-stage-heading">
           <div><span className="eyebrow">INTELIGÊNCIA TERRITORIAL</span><h2>Explore a rede de saúde no território</h2><p>Movimente o mapa, aproxime regiões e selecione um estabelecimento para ver seus dados cadastrais.</p></div>
-          <span className="map-stage-status"><i /> {googleMapsConfigured ? 'Google Maps conectado' : 'Mapa alternativo ativo'}</span>
+          <span className="map-stage-status"><i /> Leaflet · OpenStreetMap</span>
         </div>
         <FacilityMap rows={rows} full user={user} onOpenAuth={onOpenAuth} filters={{ resource, query: params }} mapViewId={mapViewId} selectedId={selectedFacilityId} onSelectPoint={setSelectedFacilityId} />
       </section>}
@@ -1080,7 +1053,7 @@ function ResourceExplorer({ initialResource, allowedResources, user, onOpenAuth,
   </div>;
 }
 function MapPage({ user, onOpenAuth }) {
-  return <div className="immersive-map-page"><PageHeading eyebrow="EXPLORAÇÃO GEOGRÁFICA" title="Mapa de inteligência em saúde" description="Uma visão territorial interativa da rede pública. Explore a distribuição dos estabelecimentos a partir das coordenadas publicadas nas bases oficiais." right={<span className="map-title-chip"><MapPinned size={15} /> {googleMapsConfigured ? 'Google Maps · Satélite + 3D' : 'Mapa alternativo · Google Maps opcional'}</span>} /><ResourceExplorer initialResource="cnesEstablishments" allowedResources={RESOURCE_SECTIONS.map} user={user} onOpenAuth={onOpenAuth} withMap immersiveMap title="Exploração territorial" /></div>;
+  return <div className="immersive-map-page"><PageHeading eyebrow="EXPLORAÇÃO GEOGRÁFICA" title="Mapa de inteligência em saúde" description="Uma visão territorial interativa da rede pública. Explore a distribuição dos estabelecimentos a partir das coordenadas publicadas nas bases oficiais." right={<span className="map-title-chip"><MapPinned size={15} /> OpenStreetMap · Leaflet</span>} /><ResourceExplorer initialResource="cnesEstablishments" allowedResources={RESOURCE_SECTIONS.map} user={user} onOpenAuth={onOpenAuth} withMap immersiveMap title="Exploração territorial" /></div>;
 }
 function NetworkPage({ user, onOpenAuth }) {
   return <><PageHeading eyebrow="ESTRUTURA ASSISTENCIAL" title="Rede de saúde" description="Pesquise UBS, hospitais, estabelecimentos e informações cadastrais do CNES." /><ResourceExplorer initialResource="ubs" allowedResources={RESOURCE_SECTIONS.network} user={user} onOpenAuth={onOpenAuth} title="Estabelecimentos e serviços" /></>;
@@ -1211,7 +1184,7 @@ function SourcesPage() {
   return <><PageHeading eyebrow="RASTREABILIDADE E CONFIANÇA" title="Fontes e metodologia" description="Documentação, cobertura, atualização e limitações das fontes que alimentam a plataforma." right={<button className="btn-outline-custom" onClick={refresh}><RefreshCw size={14} /> Atualizar verificação</button>} />
     <div className="source-status-banner"><div className="source-status-icon"><Database size={22} /></div><div><b>API de Dados Abertos — DEMAS</b><span>{status?.title || 'Ministério da Saúde'} · versão {status?.version || '—'}</span></div><div className="ms-auto"><StatusPill status={status?.swagger} /><small>Verificado em {formatDate(status?.checkedAt)}</small></div></div>
     {error && <ErrorPanel error={{ message: error }} onRetry={refresh} />}{loading && <Loading label="Verificando documentação oficial…" />}
-    <section className="methodology-grid"><div className="methodology-card"><span className="method-icon"><Database size={18} /></span><h3>Origem dos dados</h3><p>API pública de Dados Abertos do Ministério da Saúde (DEMAS), com documentação Swagger/OAS. Os endpoints são revalidados na documentação antes de cada tipo de consulta.</p><a href="https://apidadosabertos.saude.gov.br/" target="_blank" rel="noreferrer">Abrir documentação da API <ExternalLink size={13} /></a></div><div className="methodology-card"><span className="method-icon"><MapPinned size={18} /></span><h3>Cartografia</h3><p>{googleMapsConfigured ? 'Google Maps Platform com modos de ruas, satélite, híbrido e visualização 3D; as camadas epidemiológicas usam malhas oficiais do IBGE.' : 'Mapa alternativo baseado em OpenStreetMap. Google Maps pode ser ativado com uma chave restrita por domínio na Vercel; não é necessário criar arquivo .env.'} Marcadores aparecem exclusivamente quando a resposta contém latitude e longitude dentro da área geográfica brasileira.</p><a href={googleMapsConfigured ? "https://developers.google.com/maps/documentation/javascript/overview" : "https://console.cloud.google.com/google/maps-apis/credentials"} target="_blank" rel="noreferrer">{googleMapsConfigured ? 'Documentação do Google Maps' : 'Configurar Google Maps'} <ExternalLink size={13} /></a></div><div className="methodology-card"><span className="method-icon"><ShieldCheck size={18} /></span><h3>LGPD e dados sensíveis</h3><p>Não integramos registros individuais do e-SUS Notifica ao mapa público. CPF, CNS, nomes, contatos, endereços e sintomas de pacientes não são exibidos nem persistidos nesta plataforma.</p><a href="https://www.gov.br/esocial/pt-br/acesso-a-informacao/lgpd" target="_blank" rel="noreferrer">Referência LGPD <ExternalLink size={13} /></a></div></section>
+    <section className="methodology-grid"><div className="methodology-card"><span className="method-icon"><Database size={18} /></span><h3>Origem dos dados</h3><p>API pública de Dados Abertos do Ministério da Saúde (DEMAS), com documentação Swagger/OAS. Os endpoints são revalidados na documentação antes de cada tipo de consulta.</p><a href="https://apidadosabertos.saude.gov.br/" target="_blank" rel="noreferrer">Abrir documentação da API <ExternalLink size={13} /></a></div><div className="methodology-card"><span className="method-icon"><MapPinned size={18} /></span><h3>Cartografia</h3><p>Mapas interativos baseados em Leaflet e OpenStreetMap, com malhas territoriais oficiais do IBGE. Marcadores aparecem exclusivamente quando a resposta contém latitude e longitude dentro da área geográfica brasileira.</p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Créditos cartográficos do OpenStreetMap <ExternalLink size={13} /></a></div><div className="methodology-card"><span className="method-icon"><ShieldCheck size={18} /></span><h3>LGPD e dados sensíveis</h3><p>Não integramos registros individuais do e-SUS Notifica ao mapa público. CPF, CNS, nomes, contatos, endereços e sintomas de pacientes não são exibidos nem persistidos nesta plataforma.</p><a href="https://www.gov.br/esocial/pt-br/acesso-a-informacao/lgpd" target="_blank" rel="noreferrer">Referência LGPD <ExternalLink size={13} /></a></div></section>
     <section className="catalog-section"><div className="section-title-row"><div><span className="eyebrow">CATÁLOGO VALIDADO</span><h2>Operações configuradas</h2><p>Lista derivada do catálogo DEMAS; cada operação precisa existir no Swagger atual para ser chamada.</p></div><span className="catalog-count">{sources.length} fontes</span></div>
       {Object.entries(byGroup).map(([group, items]) => <div className="catalog-group" key={group}><h3>{group}</h3><div className="catalog-list">{items.map(item => <div className="catalog-item" key={item.id}><div><b>{item.label}</b><small>{item.description}</small><code>GET {item.path}</code></div><span className="catalog-ready"><CheckCircle2 size={14} /> Configurada · validar ao consultar</span></div>)}</div></div>)}
     </section>
@@ -1291,9 +1264,25 @@ function AuthDialog({ user, onClose }) {
     } catch (error) { setMessage(error.message || 'Não foi possível concluir a operação de autenticação.'); }
     finally { setLoading(false); }
   };
+  const signInWithGoogle = async () => {
+    if (!supabase) { setMessage('Supabase não configurado. Defina as variáveis públicas do projeto.'); return; }
+    setLoading(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin }
+      });
+      if (error) setMessage(error.message || 'Não foi possível iniciar o acesso com Google.');
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível iniciar o acesso com Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
   const logout = async () => { if (supabase) await supabase.auth.signOut(); onClose(); };
   const title = mode === 'login' ? 'Acesse sua conta' : mode === 'signup' ? 'Criar conta' : 'Recuperar acesso';
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}><div className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title"><div className="auth-brand-lockup"><img src="/healthdata-logo-lockup.webp" alt="HealthData Brasil — Dados em saúde. Um Brasil mais informado." /></div><button className="dialog-close" onClick={onClose} aria-label="Fechar"><X size={18} /></button>{user ? <><span className="auth-icon"><Users size={22} /></span><h2 id="auth-title">Sua conta</h2><p className="auth-subtitle">Sessão conectada como {user.email}.</p><button className="btn-outline-custom w-100 justify-content-center" onClick={logout}><LogOut size={15} /> Sair da conta</button></> : <><span className="auth-icon"><ShieldCheck size={22} /></span><h2 id="auth-title">{title}</h2><p className="auth-subtitle">Salve filtros e consultas para continuar sua análise depois.</p><form onSubmit={submit}><div className="field-wrap"><label htmlFor="auth-email">E-mail</label><input id="auth-email" type="email" className="form-control" required value={email} onChange={event => setEmail(event.target.value)} /></div>{mode !== 'reset' && <div className="field-wrap"><label htmlFor="auth-password">Senha</label><input id="auth-password" type="password" minLength="8" className="form-control" required value={password} onChange={event => setPassword(event.target.value)} /></div>}<button className="btn-primary-custom w-100 justify-content-center" disabled={loading}>{loading ? <span className="spinner-border spinner-border-sm" /> : <LogIn size={15} />}{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar instruções'}</button></form><div className="auth-mode-links"><button className="auth-mode-toggle" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage(''); }}>{mode === 'login' ? 'Ainda não tem conta? Criar acesso' : 'Voltar para entrar'}</button>{mode === 'login' && <button className="auth-mode-toggle" onClick={() => { setMode('reset'); setMessage(''); }}>Esqueci minha senha</button>}</div></>}{message && <div className="auth-message" role="status">{message}</div>}{!authReady && <small className="auth-config-note">Autenticação aguardando as variáveis públicas do Supabase.</small>}</div></div>;
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}><div className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title"><div className="auth-brand-lockup"><img src="/healthdata-logo-lockup.webp" alt="HealthData Brasil — Dados em saúde. Um Brasil mais informado." /></div><button className="dialog-close" onClick={onClose} aria-label="Fechar"><X size={18} /></button>{user ? <><span className="auth-icon"><Users size={22} /></span><h2 id="auth-title">Sua conta</h2><p className="auth-subtitle">Sessão conectada como {user.email}.</p><button className="btn-outline-custom w-100 justify-content-center" onClick={logout}><LogOut size={15} /> Sair da conta</button></> : <><span className="auth-icon"><ShieldCheck size={22} /></span><h2 id="auth-title">{title}</h2><p className="auth-subtitle">Salve filtros e consultas para continuar sua análise depois.</p>{mode !== 'reset' && <><button type="button" className="btn-outline-custom w-100 justify-content-center" onClick={signInWithGoogle} disabled={loading}><Globe2 size={15} /> Continuar com Google</button><div className="auth-divider"><span>ou continue com e-mail</span></div></>}<form onSubmit={submit}><div className="field-wrap"><label htmlFor="auth-email">E-mail</label><input id="auth-email" type="email" className="form-control" required value={email} onChange={event => setEmail(event.target.value)} /></div>{mode !== 'reset' && <div className="field-wrap"><label htmlFor="auth-password">Senha</label><input id="auth-password" type="password" minLength="8" className="form-control" required value={password} onChange={event => setPassword(event.target.value)} /></div>}<button className="btn-primary-custom w-100 justify-content-center" disabled={loading}>{loading ? <span className="spinner-border spinner-border-sm" /> : <LogIn size={15} />}{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar instruções'}</button></form><div className="auth-mode-links"><button className="auth-mode-toggle" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage(''); }}>{mode === 'login' ? 'Ainda não tem conta? Criar acesso' : 'Voltar para entrar'}</button>{mode === 'login' && <button className="auth-mode-toggle" onClick={() => { setMode('reset'); setMessage(''); }}>Esqueci minha senha</button>}</div></>}{message && <div className="auth-message" role="status">{message}</div>}{!authReady && <small className="auth-config-note">Autenticação aguardando as variáveis públicas do Supabase.</small>}</div></div>;
 }
 function NotFound() { return <div className="empty-state not-found"><CircleHelp size={30} /><b>Página não encontrada</b><Link to="/">Voltar ao início <ArrowRight size={14} /></Link></div>; }
 

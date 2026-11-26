@@ -32,27 +32,22 @@ As variáveis abaixo são opcionais e só devem ser cadastradas em **Settings �
 
 A API permite a própria origem automaticamente. Se a interface e a API forem chamadas pelo mesmo domínio Vercel, `CORS_ORIGINS` não precisa incluir URLs de preview. Para consumo cross-origin, informe apenas origens exatas, incluindo `https://`.
 
-### Google Maps (opcional; não exige arquivo `.env`)
+### Mapas
 
-O mapa continua acessível pelo OpenStreetMap quando não há chave Google. Para ativar Google Maps com modos **Mapa**, **Satélite**, **Híbrido** e **3D** na Vercel, cadastre estas variáveis diretamente em **Project → Settings → Environment Variables**:
+Os mapas usam exclusivamente **Leaflet + OpenStreetMap** e as malhas territoriais oficiais do IBGE. Não há chave cartográfica, serviço Google Maps ou variável de ambiente para mapas. A atribuição do OpenStreetMap é exibida na interface.
 
-| Variável | Obrigatória | Conteúdo |
-|---|---|---|
-| `VITE_GOOGLE_MAPS_API_KEY` | Sim, para Google Maps | Chave pública da Maps JavaScript API |
-| `VITE_GOOGLE_MAPS_MAP_ID` | Recomendável | Map ID criado no Google Cloud; se omitido, usa `DEMO_MAP_ID` para teste |
+### Login com Google (OAuth 2.0 via Supabase Auth)
 
-Passos no Google Cloud:
+O Google é utilizado somente como provedor de identidade. A aplicação chama `supabase.auth.signInWithOAuth({ provider: 'google' })`; o fluxo de autenticação e a sessão são gerenciados pelo Supabase Auth. Não adicione credenciais OAuth ao frontend nem crie endpoints próprios para armazenar tokens Google.
 
-1. Crie ou selecione um projeto no Google Cloud Console e associe uma conta de faturamento.
-2. Habilite **Maps JavaScript API**.
-3. Crie uma API key e restrinja **Application restrictions → Websites (HTTP referrers)** aos domínios usados, por exemplo `https://SEU-PROJETO.vercel.app/*`, seu domínio personalizado e `http://localhost:5173/*` para desenvolvimento.
-4. Em **API restrictions**, limite a chave à **Maps JavaScript API**.
-5. Crie um **Map ID** para JavaScript e cadastre-o em `VITE_GOOGLE_MAPS_MAP_ID`.
-6. Cadastre as duas variáveis na Vercel nos ambientes Preview e Production e faça um novo deploy. Variáveis `VITE_*` são incorporadas durante o build.
+1. No Google Cloud Console, crie um OAuth Client ID do tipo **Web application**.
+2. Em **Authorized JavaScript origins**, adicione o domínio de produção e o domínio local de desenvolvimento (por exemplo, `http://localhost:5173`).
+3. Em **Authorized redirect URIs**, adicione o callback exibido na configuração do provedor Google do projeto Supabase: `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. No Supabase Dashboard, abra **Authentication → Sign In / Providers → Google**, habilite o provedor e informe o Client ID e o Client Secret obtidos no Google Cloud Console.
+5. Em **Authentication → URL Configuration**, configure a Site URL de produção e inclua os endereços de desenvolvimento/produção na Redirect URLs allow list. O destino de retorno do app é a origem atual (`window.location.origin`).
+6. Salve as configurações e teste o fluxo nos domínios autorizados.
 
-A chave `VITE_GOOGLE_MAPS_API_KEY` é entregue ao navegador por definição; não é uma senha. Proteja-a com restrições de domínio e API, monitore uso e configure cotas/alertas de faturamento. A Maps JavaScript API padrão requer faturamento habilitado. A Maps Demo Key é gratuita para prototipagem com limites e não é indicada para produção. A cobertura de edifícios fotorealistas em 3D varia conforme a região; fora das áreas cobertas, o Google ainda pode exibir imagem aérea/terreno sem edifícios 3D.
-
-**Não crie `.env` para publicar.** A configuração é feita diretamente no painel da Vercel. Em desenvolvimento local, a chave pode ser fornecida pelo ambiente do terminal ou por um `.env.local` opcional ignorado pelo Git; sem ela, o mapa alternativo continua operacional.
+O Client Secret deve existir somente nas configurações do provedor no Supabase. Nunca o coloque em variáveis `VITE_*`, arquivos do repositório ou código cliente. O redirect URI cadastrado no Google aponta para o callback do Supabase; a URL de retorno do usuário é configurada separadamente na allowlist do Supabase.
 
 ### Recursos opcionais que dependem do Supabase
 

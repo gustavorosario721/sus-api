@@ -20,7 +20,7 @@ Use o teste acima antes de testar a rota local correspondente. O código municip
 ## Módulos existentes
 
 - Visão geral com status do Swagger, API DEMAS e API interna, consulta real e paginação por endpoint.
-- Mapa de estabelecimentos com Google Maps JavaScript API opcional (ruas, satélite, híbrido e visualização 3D), marcadores avançados e clusterização; sem chave Google, usa OpenStreetMap/Leaflet como alternativa. A concentração de unidades usa círculos translúcidos e agrupamento, sem depender da antiga HeatmapLayer do Google, removida em 2026. Tela cheia, geolocalização mediante permissão e salvamento de posição/camadas no Supabase.
+- Mapa de estabelecimentos com Leaflet e OpenStreetMap, marcadores avançados, clusterização e concentração de unidades por círculos translúcidos. Tela cheia, geolocalização mediante permissão e salvamento de posição/camadas no Supabase.
 - Rede de Saúde com endpoints CNES/UBS/hospitais/leitos/equipamentos preservados.
 - Epidemiologia com dengue, Zika e chikungunya agregadas no backend, mapa coroplético por UF e mapa municipal limitado aos 25 municípios com maior contagem da página atual.
 - Vacinação PNI 2025/2026 com allowlist e agregação; não calcula cobertura sem denominador apropriado.
@@ -71,10 +71,10 @@ A existência de uma operação no Swagger não significa autorização para exp
 
 ## Mapa e cartografia
 
-- Base prioritária opcional: Google Maps JavaScript API, com modos de ruas, satélite, híbrido e mapa 3D quando habilitado por uma chave restrita por domínio.
+- Base cartográfica: OpenStreetMap com Leaflet; os mapas territoriais usam malhas oficiais do IBGE.
 - Alternativa sem chave: OpenStreetMap/Leaflet, com os créditos cartográficos correspondentes.
 - Malhas de estados e municípios: API de Malhas do IBGE em GeoJSON; os polígonos epidemiológicos continuam sendo dados territoriais oficiais, não dados individuais de pacientes.
-- Não é necessário criar `.env`: a chave Google é opcional e pode ser cadastrada diretamente nas variáveis de ambiente da Vercel como `VITE_GOOGLE_MAPS_API_KEY`; `VITE_GOOGLE_MAPS_MAP_ID` também é opcional, mas recomendado para produção.
+- Não há dependência de chave de mapas ou serviço cartográfico proprietário. A autenticação Google é feita exclusivamente pelo Supabase Auth.
 - Marcadores de estabelecimento só são colocados com coordenadas válidas presentes na resposta da fonte. Não há geocodificação automática; ausência de coordenadas não é substituída por endereço aproximado.
 - O heatmap de estabelecimentos mostra concentração de unidades, não casos epidemiológicos.
 - O mapa epidemiológico usa agregados territoriais; o coroplético municipal mostra somente até 25 municípios com códigos disponíveis na página atual. Não representa localização de pacientes.
@@ -116,6 +116,10 @@ Todas as variáveis abaixo são opcionais para consultas públicas. Só crie um 
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`: cliente público.
 
 Não compartilhe nem comite `.env`.
+
+## Autenticação Google
+
+O login Google é integrado exclusivamente pelo Supabase Auth. A aplicação usa OAuth 2.0 por `signInWithOAuth`; o Client Secret permanece configurado no provedor Google do Supabase. Consulte `docs/GOOGLE-OAUTH-SUPABASE.md` para configurar origens, callback e URLs de redirecionamento.
 
 ## Supabase
 
@@ -169,6 +173,5 @@ A consulta de estados não usa mais a rota inválida `/api/v3/malhas/estados` se
 
 ## Mapa imersivo e infográfico
 
-A página **Mapa interativo** oferece busca nos estabelecimentos retornados pela consulta atual, métricas de georreferenciamento e visualização Google Maps/3D quando a chave está configurada. Sem chave, usa OpenStreetMap como alternativa. A rota **Infográfico** transforma a resposta real da fonte em indicadores, gráficos por território/período/composição, tabela, CSV e impressão em PDF. Visualizações sem campos suficientes são identificadas como indisponíveis; nenhum dado é inventado. Veja `docs/EXPERIENCIA-MAPA-INFOGRAFICO.md`.
+A página **Mapa interativo** oferece busca nos estabelecimentos retornados pela consulta atual, métricas de georreferenciamento e visualização Leaflet/OpenStreetMap. A rota **Infográfico** transforma a resposta real da fonte em indicadores, gráficos por território/período/composição, tabela, CSV e impressão em PDF. Visualizações sem campos suficientes são identificadas como indisponíveis; nenhum dado é inventado. Veja `docs/EXPERIENCIA-MAPA-INFOGRAFICO.md`.
 
-Para ativar o Google Maps na Vercel, configure `VITE_GOOGLE_MAPS_API_KEY` e `VITE_GOOGLE_MAPS_MAP_ID` em **Settings → Environment Variables** e faça um novo deploy. Não é necessário criar um arquivo `.env`.
