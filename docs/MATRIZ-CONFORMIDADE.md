@@ -1,7 +1,7 @@
 # Matriz de conformidade — HealthData Brasil
 
-**Atualizada em:** 25/11/2026  
-**Escopo da validação:** cópia local de trabalho do projeto existente. Nenhum banco Supabase, repositório GitHub ou projeto Vercel foi alterado ou publicado nesta execução.
+**Atualizada em:** 26/11/2026  
+**Escopo da validação:** branch `codex/healthdata-foundation` no repositório `gustavorosario721/sus-api`. As alterações desta branch ainda não foram mescladas nem publicadas. Nenhum banco Supabase foi alterado.
 
 Estados usados:
 - **CONCLUÍDO:** implementado e validado por teste executado.
@@ -23,7 +23,7 @@ Estados usados:
 | Paginação | PARCIAL | Navegação por página somente quando a operação documenta `offset`; `limit` máximo lido por endpoint do Swagger. Operações sem deslocamento não recebem `offset` inventado nem exibem controles inoperantes. | Testes unitários de máximo, metadados e ausência de `offset` aprovados; consultas upstream pendentes. |
 | Normalização | PARCIAL | Extração de envelopes comuns e normalização para gráficos/mapa; metadados de fonte/consulta preservados. | Testes unitários de envelopes e coordenadas aprovados; validação de todos os esquemas pendente. |
 | Dashboard | PARCIAL | Consulta real e indicadores restritos ao escopo/página consultada; gráficos de ano e UF com campos reconhecidos. | Teste unitário de analytics aprovado; métricas nacionais completas pendentes. |
-| Mapa de estabelecimentos | PARCIAL | Leaflet/OSM, markercluster, heatmap de densidade de unidades, coordenadas válidas, geolocalização e tela cheia. | JSX transpila; não houve teste de navegador nem feed real da API. |
+| Mapa de estabelecimentos | PARCIAL | Leaflet/OSM, markercluster, heatmap de densidade de unidades, coordenadas válidas, geolocalização, tela cheia e visualizações salvas. Integração Google Maps removida para manter a cartografia em Leaflet/OSM. | Alteração registrada na branch; build e teste de navegador ainda não executados após a mudança. |
 | Mapa coroplético estadual | PARCIAL | Malha GeoJSON do IBGE com agregação por UF; consulta nacional com fallback para endpoints por código de UF (sem rota inválida /estados sem identificador). | Código e integração implementados; download do IBGE não pôde ser validado por DNS nesta sessão. |
 | Mapa coroplético municipal | PARCIAL | Consulta controlada de até 25 malhas municipais IBGE por códigos presentes na página atual. | Implementação de rota e visualização; sem teste de rede/navegador. Não equivale a um mapa nacional completo. |
 | Heatmap epidemiológico | PARCIAL | Camada epidemiológica agregada por centroide de UF, em separado do heatmap de estabelecimentos. | Código implementado; precisa validação cartográfica visual. |
@@ -32,7 +32,7 @@ Estados usados:
 | Backend REST | PARCIAL | Rotas específicas `/api/overview`, `/api/estabelecimentos`, `/api/map/points`, `/api/indicadores/*`, `/api/geo/*`; erros padronizados, retry, cache e rate limit. Contratos verificados com testes puros de normalização, paginação, privacidade e status. | `npm run check` aprovado; sem testes HTTP de integração neste ambiente. |
 | CORS | PARCIAL | Allowlist explícita `CORS_ORIGINS`, sem wildcard de Vercel; origem não autorizada retorna 403. | Revisão estática; teste HTTP em runtime pendente. |
 | Monitoramento de status | PARCIAL | Swagger + operação GET real; 401/403/404 não são classificados como disponível. | Revisão estática; chamada ao endpoint bloqueada pelo DNS da sessão. |
-| Supabase Auth | PARCIAL | Cadastro, login, logout, recuperação e sessão no cliente. | Não há projeto HealthData conectado para executar autenticação. |
+| Supabase Auth | PARCIAL | Cadastro, login, logout, recuperação e sessão no cliente; botão de OAuth Google via `signInWithOAuth` adicionado. | Provedor Google, redirect allowlist e sessão real ainda dependem de um projeto Supabase dedicado. |
 | Favoritos e filtros | PARCIAL | Salvar/listar/reabrir, renomear e excluir na tela de salvos. | Código presente; requer Supabase para teste real. |
 | Histórico | PARCIAL | Registro e listagem/exclusão de consultas da conta. | Código presente; requer Supabase. |
 | Visualizações do mapa | PARCIAL | Salvar centro, zoom, camadas, fonte e filtros; restauração pela URL e consulta da posição/camadas por usuário. | Correção de restauração revisada; requer Supabase e navegador para teste ponta a ponta. |
@@ -46,11 +46,20 @@ Estados usados:
 | Testes automatizados | PARCIAL | Dezessete testes unitários implementados. | `npm test`: 17/17 aprovados; inclui classificação de HTTP 2xx, 401/403, 429, 404 e 5xx. |
 | Check de sintaxe backend | CONCLUÍDO | `node --check` para backend e handlers serverless. | `npm run check`: aprovado. |
 | Sintaxe JSX | CONCLUÍDO | Transpilação sintática com TypeScript global, JSX React. | `frontend/src/App.jsx`: sem diagnósticos. |
-| Build Vite | BLOQUEADO | Dependências não puderam ser instaladas no ambiente de edição por falha de DNS/timeout. | `npm install` expirou; `npm run build` foi tentado e falhou porque `vite` não estava instalado (`vite: not found`). |
+| Tailwind CSS | PENDENTE | A interface ainda utiliza Bootstrap e CSS próprio. A migração para Tailwind não foi iniciada porque não foi possível regenerar e validar o lockfile de dependências neste ambiente sem acesso ao registry npm. | Requer instalação controlada de `tailwindcss` e `@tailwindcss/vite`, atualização do lockfile e build. |
+| Build Vite | BLOQUEADO | Dependências não puderam ser instaladas no ambiente de edição por falha de DNS/timeout. | `npm install` expirou; `npm run build` foi tentado e falhou porque `vite` não estava instalado (`vite: not found`). O build ainda não foi repetido após as alterações desta branch. |
 | Supabase conectado/migration aplicada | BLOQUEADO | Nenhum projeto dedicado HealthData está conectado. Não foi usado o projeto SalaON nem outro banco existente. | Nenhuma migration aplicada. |
-| GitHub | BLOQUEADO | Não foi encontrado repositório HealthData Brasil acessível; repositório SalaON preservado sem alterações. | Listagem do GitHub consultada. |
-| Vercel/deploy | BLOQUEADO | Não foi encontrado projeto Vercel HealthData Brasil. | Busca de projetos Vercel retornou zero resultados. |
+| GitHub | PARCIAL | Repositório `gustavorosario721/sus-api` acessível; branch `codex/healthdata-foundation` criada a partir de `main` e alterações registradas em commits separados. | Comparação de branches confirmou commits à frente de `main`; nenhuma alteração foi aplicada diretamente em `main`. |
+| Vercel/deploy | BLOQUEADO | Nenhum projeto Vercel está vinculado ao repositório. A tentativa de criar o projeto `healthdata-brasil` pela integração retornou HTTP 403 (permissão insuficiente). | Sem projeto vinculado e sem deployment Preview/Production. A criação exige permissão de projeto na equipe Vercel. |
 | AV2 Canva | BLOQUEADO | A página abriu somente o título/contêiner, sem os critérios completos. | Precisa PDF ou capturas da avaliação. |
+
+## Estado desta execução
+
+- Google OAuth foi implementado na interface, mas não pode ser validado sem o provedor habilitado em um projeto Supabase.
+- A documentação antiga de Google Maps foi removida e substituída por `docs/GOOGLE-OAUTH-SUPABASE.md`.
+- O uso de Leaflet/OpenStreetMap foi consolidado; nenhuma chave Google Maps é necessária.
+- A branch de trabalho tem commits próprios e não altera `main`.
+- Não foram executados `npm run check`, `npm test` ou `npm run build` após as alterações desta branch. O status anterior descrito acima pertence à revisão anterior.
 
 ## Observações de interpretação
 
