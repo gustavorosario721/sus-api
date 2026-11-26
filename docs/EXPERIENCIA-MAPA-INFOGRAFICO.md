@@ -11,7 +11,7 @@
 
 A página `/mapa` mantém as consultas reais do CNES e oferece uma área cartográfica ampliada. A busca filtra os estabelecimentos presentes na página consultada por nome, município, UF, tipo ou código CNES. Os indicadores separam estabelecimentos com coordenadas válidas, total de registros retornados e registros sem coordenadas.
 
-Quando `VITE_GOOGLE_MAPS_API_KEY` está configurada, a aplicação usa Google Maps JavaScript API; `VITE_GOOGLE_MAPS_MAP_ID` habilita recursos avançados e é usado na visualização 3D quando a região e a conta oferecem suporte. Sem as variáveis, a aplicação mantém o mapa alternativo OpenStreetMap/Leaflet. Não é necessário criar `.env`: as variáveis podem ser definidas diretamente no painel da Vercel antes do build.
+A cartografia utiliza Leaflet e OpenStreetMap, sem chave externa. As malhas de estados e municípios são obtidas da API oficial do IBGE.
 
 Os marcadores são criados exclusivamente a partir de latitude/longitude existentes nos registros da consulta atual. O modo de concentração representa a distribuição das unidades georreferenciadas, não prevalência ou incidência de doenças. O modo 3D limita a amostra a 250 pontos para preservar desempenho.
 
@@ -39,4 +39,4 @@ npm test
 npm run build
 ```
 
-A ativação do Google Maps depende de uma chave válida, API habilitada, faturamento e restrições de domínio no Google Cloud. Sem isso, o mapa alternativo continua sendo a opção de contingência.
+A autenticação com Google é realizada pelo Supabase Auth; consulte `DEPLOY-VERCEL.md` para configurar o provedor OAuth e os endereços de redirecionamento.
