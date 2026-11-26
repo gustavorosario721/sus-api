@@ -632,7 +632,6 @@ function FacilityMap({ rows, full = false, user, onOpenAuth, filters = {}, mapVi
   const [showHeat, setShowHeat] = useState(false);
   const [mapView, setMapView] = useState({ center_lat: -14.2, center_lng: -51.9, zoom: 4 });
   const [mapSaveMessage, setMapSaveMessage] = useState('');
-  const [initialMapView, setInitialMapView] = useState(null);
   const [facilitySearch, setFacilitySearch] = useState('');
   const frameRef = useRef(null);
   const allPoints = useMemo(() => rows.map(facilityPoint).filter(Boolean), [rows]);
@@ -645,18 +644,6 @@ function FacilityMap({ rows, full = false, user, onOpenAuth, filters = {}, mapVi
   const points = useMemo(() => matchingPoints.slice(0, 1500), [matchingPoints]);
   const captureMapView = useCallback(view => setMapView(view), []);
   const restoreLayers = useCallback(layers => setShowHeat(Boolean(layers?.find(layer => layer.key === 'facility-density')?.enabled)), []);
-  useEffect(() => {
-    let active = true;
-    if (!user?.id || !supabase) return () => { active = false; };
-    let query = supabase.from('saved_map_views').select('center_lat,center_lng,zoom,layers').eq('user_id', user.id);
-    query = mapViewId ? query.eq('id', mapViewId) : query.order('created_at', { ascending: false }).limit(1);
-    query.maybeSingle().then(({ data }) => {
-      if (!active || !data || !Number.isFinite(Number(data.center_lat)) || !Number.isFinite(Number(data.center_lng))) return;
-      setInitialMapView({ center_lat: Number(data.center_lat), center_lng: Number(data.center_lng), zoom: Number(data.zoom) || 4 });
-      restoreLayers(data.layers || []);
-    });
-    return () => { active = false; };
-  }, [user?.id, mapViewId, restoreLayers]);
   const saveMapView = async () => {
     if (!user) { onOpenAuth?.(); return; }
     if (!supabase) { setMapSaveMessage('Salvar visualizações exige uma conta conectada ao Supabase. O mapa continua disponível.'); return; }
