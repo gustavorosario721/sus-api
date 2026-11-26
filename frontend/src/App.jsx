@@ -238,19 +238,38 @@ function QueryField({ parameter, value, onChange }) {
 function useAuth() {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session || null);
-      setUser(data.session?.user || null);
+    if (!supabase) {
+      setLoading(false);
+      return undefined;
+    }
+    let active = true;
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      const nextSession = error ? null : data.session || null;
+      setSession(nextSession);
+      setUser(nextSession?.user || null);
+      setLoading(false);
+    }).catch(() => {
+      if (active) {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!active) return;
       setSession(next || null);
       setUser(next?.user || null);
+      setLoading(false);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
-  return { user, session };
+  return { user, session, loading };
 }
 
 function App() {
@@ -282,6 +301,9 @@ function App() {
   useEffect(() => setMobileNav(false), [location.pathname]);
 
   const toggleTheme = () => setTheme(value => value === 'light' ? 'dark' : 'light');
+  if (!authReady) return <AuthGateMessage />;
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!user) return <div className="auth-gate-screen"><AuthDialog user={null} required onClose={() => {}} /></div>;
   return (
     <div className="app-shell">
       <main className="main-area">
@@ -1245,7 +1267,13 @@ function SavedQueriesPage({ user, onOpenAuth }) {
   </>;
 }
 
-function AuthDialog({ user, onClose }) {
+function AuthLoadingScreen() {
+  return <div className="auth-gate-status" role="status"><span className="spinner-border" /><b>Verificando sua sessão…</b><small>Aguarde enquanto confirmamos seu acesso.</small></div>;
+}
+function AuthGateMessage() {
+  return <div className="auth-gate-status" role="alert"><ShieldCheck size={30} /><b>Autenticação indisponível</b><small>O serviço de autenticação não está configurado. Entre em contato com o responsável pela plataforma.</small></div>;
+}
+function AuthDialog({ user, onClose, required = false }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1282,7 +1310,7 @@ function AuthDialog({ user, onClose }) {
   };
   const logout = async () => { if (supabase) await supabase.auth.signOut(); onClose(); };
   const title = mode === 'login' ? 'Acesse sua conta' : mode === 'signup' ? 'Criar conta' : 'Recuperar acesso';
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}><div className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title"><div className="auth-brand-lockup"><img src="/healthdata-logo-lockup.webp" alt="HealthData Brasil — Dados em saúde. Um Brasil mais informado." /></div><button className="dialog-close" onClick={onClose} aria-label="Fechar"><X size={18} /></button>{user ? <><span className="auth-icon"><Users size={22} /></span><h2 id="auth-title">Sua conta</h2><p className="auth-subtitle">Sessão conectada como {user.email}.</p><button className="btn-outline-custom w-100 justify-content-center" onClick={logout}><LogOut size={15} /> Sair da conta</button></> : <><span className="auth-icon"><ShieldCheck size={22} /></span><h2 id="auth-title">{title}</h2><p className="auth-subtitle">Salve filtros e consultas para continuar sua análise depois.</p>{mode !== 'reset' && <><button type="button" className="btn-outline-custom w-100 justify-content-center" onClick={signInWithGoogle} disabled={loading}><Globe2 size={15} /> Continuar com Google</button><div className="auth-divider"><span>ou continue com e-mail</span></div></>}<form onSubmit={submit}><div className="field-wrap"><label htmlFor="auth-email">E-mail</label><input id="auth-email" type="email" className="form-control" required value={email} onChange={event => setEmail(event.target.value)} /></div>{mode !== 'reset' && <div className="field-wrap"><label htmlFor="auth-password">Senha</label><input id="auth-password" type="password" minLength="8" className="form-control" required value={password} onChange={event => setPassword(event.target.value)} /></div>}<button className="btn-primary-custom w-100 justify-content-center" disabled={loading}>{loading ? <span className="spinner-border spinner-border-sm" /> : <LogIn size={15} />}{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar instruções'}</button></form><div className="auth-mode-links"><button className="auth-mode-toggle" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage(''); }}>{mode === 'login' ? 'Ainda não tem conta? Criar acesso' : 'Voltar para entrar'}</button>{mode === 'login' && <button className="auth-mode-toggle" onClick={() => { setMode('reset'); setMessage(''); }}>Esqueci minha senha</button>}</div></>}{message && <div className="auth-message" role="status">{message}</div>}{!authReady && <small className="auth-config-note">Autenticação aguardando as variáveis públicas do Supabase.</small>}</div></div>;
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={event => !required && event.target === event.currentTarget && onClose()}><div className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title"><div className="auth-brand-lockup"><img src="/healthdata-logo-lockup.webp" alt="HealthData Brasil — Dados em saúde. Um Brasil mais informado." /></div>{!required && <button className="dialog-close" onClick={onClose} aria-label="Fechar"><X size={18} /></button>}{user ? <><span className="auth-icon"><Users size={22} /></span><h2 id="auth-title">Sua conta</h2><p className="auth-subtitle">Sessão conectada como {user.email}.</p><button className="btn-outline-custom w-100 justify-content-center" onClick={logout}><LogOut size={15} /> Sair da conta</button></> : <><span className="auth-icon"><ShieldCheck size={22} /></span><h2 id="auth-title">{title}</h2><p className="auth-subtitle">Salve filtros e consultas para continuar sua análise depois.</p>{mode !== 'reset' && <><button type="button" className="btn-outline-custom w-100 justify-content-center" onClick={signInWithGoogle} disabled={loading}><Globe2 size={15} /> Continuar com Google</button><div className="auth-divider"><span>ou continue com e-mail</span></div></>}<form onSubmit={submit}><div className="field-wrap"><label htmlFor="auth-email">E-mail</label><input id="auth-email" type="email" className="form-control" required value={email} onChange={event => setEmail(event.target.value)} /></div>{mode !== 'reset' && <div className="field-wrap"><label htmlFor="auth-password">Senha</label><input id="auth-password" type="password" minLength="8" className="form-control" required value={password} onChange={event => setPassword(event.target.value)} /></div>}<button className="btn-primary-custom w-100 justify-content-center" disabled={loading}>{loading ? <span className="spinner-border spinner-border-sm" /> : <LogIn size={15} />}{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar instruções'}</button></form><div className="auth-mode-links"><button className="auth-mode-toggle" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage(''); }}>{mode === 'login' ? 'Ainda não tem conta? Criar acesso' : 'Voltar para entrar'}</button>{mode === 'login' && <button className="auth-mode-toggle" onClick={() => { setMode('reset'); setMessage(''); }}>Esqueci minha senha</button>}</div></>}{message && <div className="auth-message" role="status">{message}</div>}{!authReady && <small className="auth-config-note">Autenticação aguardando as variáveis públicas do Supabase.</small>}</div></div>;
 }
 function NotFound() { return <div className="empty-state not-found"><CircleHelp size={30} /><b>Página não encontrada</b><Link to="/">Voltar ao início <ArrowRight size={14} /></Link></div>; }
 
