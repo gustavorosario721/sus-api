@@ -553,7 +553,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .zero-results-guidance .btn-outline-custom { width: 100%; justify-content: center; }
 }
 
-* ============================================================
+/* ============================================================
    HEALTHDATA BRASIL · MAPA IMERSIVO + INFOGRÁFICO INTERATIVO
    ============================================================ */
 .brand-emblem { overflow: hidden; padding: 0; }
