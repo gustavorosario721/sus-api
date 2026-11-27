@@ -17,18 +17,30 @@ export function describedMaximum(parameter) {
 export function buildPageMetadata(sourcePageCount, params, paging, totalRecordsReported) {
   if (!paging) return null;
   const limit = Number(params.get(paging.limitParameter || 'limit') || paging.defaultLimit || 100);
-  const canNavigate = Boolean(paging.offsetParameter);
-  const offset = canNavigate ? Number(params.get(paging.offsetParameter) || 0) : 0;
+  const pageParameter = paging.pageParameter || null;
+  const offsetParameter = paging.offsetParameter || null;
+  const usesPageNumber = Boolean(pageParameter && params.has(pageParameter));
+  const page = usesPageNumber
+    ? Math.max(1, Number(params.get(pageParameter) || 1))
+    : offsetParameter
+      ? Math.floor(Number(params.get(offsetParameter) || 0) / limit) + 1
+      : 1;
+  const offset = usesPageNumber
+    ? (page - 1) * limit
+    : offsetParameter ? Number(params.get(offsetParameter) || 0) : 0;
+  const canNavigate = Boolean(pageParameter || offsetParameter);
   const hasNext = canNavigate && (totalRecordsReported !== null && totalRecordsReported !== undefined
-    ? (offset + 1) * limit < totalRecordsReported
+    ? offset + limit < totalRecordsReported
     : sourcePageCount >= limit);
   return {
-    limit, offset, page: offset + 1, totalRecordsReported: totalRecordsReported ?? null,
-    canNavigate,
-    hasPrevious: canNavigate && offset > 0, hasNext,
-    previousOffset: canNavigate ? Math.max(0, offset - 1) : null,
-    nextOffset: hasNext ? offset + 1 : null,
-    offsetParameter: paging.offsetParameter || null,
-    offsetSemantics: canNavigate ? 'Índice da página iniciado em zero, conforme a descrição do Swagger.' : 'A operação não documenta parâmetro de deslocamento/página.'
+    limit, offset, page, totalRecordsReported: totalRecordsReported ?? null,
+    canNavigate, pageParameter,
+    hasPrevious: canNavigate && page > 1, hasNext,
+    previousOffset: pageParameter ? Math.max(1, page - 1) : Math.max(0, offset - limit),
+    nextOffset: pageParameter ? page + 1 : offset + limit,
+    offsetParameter,
+    offsetSemantics: pageParameter
+      ? 'Número de página iniciado em 1, conforme a documentação da fonte.'
+      : 'Deslocamento em linhas iniciado em zero, conforme a documentação da fonte.'
   };
 }
