@@ -117,12 +117,14 @@ export async function getResourceSchema(resourceId) {
     Number.isFinite(documentedDefault) && documentedDefault > 0 ? documentedDefault : 100,
     limit.maximum || 100
   ) : null;
+  const page = parameters.find(item => item.in === 'query' && item.name === 'pagina');
   const paging = limit ? {
     limitParameter: 'limit',
     offsetParameter: offset?.name || null,
+    pageParameter: page?.name || null,
     maxLimit: limit.maximum,
     defaultLimit: safeDefault,
-    offsetSemantics: 'page-index-zero-based'
+    offsetSemantics: page ? 'page-number-one-based' : 'row-offset-zero-based'
   } : null;
   return {
     id: resourceId,
@@ -224,7 +226,12 @@ export async function fetchResource(resourceId, rawParams = {}) {
     const maxAllowed = parameter?.maximum ?? null;
     if (maxAllowed !== null && requested > maxAllowed) throw Object.assign(new Error(`O limite máximo documentado para ${resource.label} é ${maxAllowed} registros por página.`), { status: 400 });
     if (!queryParams.has('limit')) queryParams.set('limit', String(schema.pagination.defaultLimit || 100));
-    if (schema.pagination.offsetParameter && !queryParams.has(schema.pagination.offsetParameter)) {
+    if (schema.pagination.pageParameter) {
+      // Prefer the documented 1-based page parameter; preserve an explicit row offset.
+      if (!queryParams.has(schema.pagination.offsetParameter)) {
+        queryParams.set(schema.pagination.pageParameter, '1');
+      }
+    } else if (schema.pagination.offsetParameter && !queryParams.has(schema.pagination.offsetParameter)) {
       queryParams.set(schema.pagination.offsetParameter, '0');
     }
   }

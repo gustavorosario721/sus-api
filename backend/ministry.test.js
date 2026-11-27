@@ -31,17 +31,31 @@ test('Swagger page-size maximum is extracted from Portuguese descriptions', () =
   assert.equal(describedMaximum({ description: 'Sem limite informado.' }), null);
 });
 
-test('page metadata uses page-index offset semantics and source total', () => {
-  const meta = buildPageMetadata(new Array(20).fill({}), new URLSearchParams('limit=20&offset=1'), { defaultLimit: 20, offsetParameter: 'offset' }, 55);
+test('row-offset pagination calculates page numbers and advances by the page size', () => {
+  const meta = buildPageMetadata(new Array(20).fill({}), new URLSearchParams('limit=20&offset=20'), { defaultLimit: 20, offsetParameter: 'offset' }, 55);
   assert.equal(meta.page, 2);
+  assert.equal(meta.offset, 20);
   assert.equal(meta.hasPrevious, true);
   assert.equal(meta.hasNext, true);
-  assert.equal(meta.nextOffset, 2);
+  assert.equal(meta.previousOffset, 0);
+  assert.equal(meta.nextOffset, 40);
+});
+
+test('page-number pagination follows the official 1-based pagina parameter', () => {
+  const meta = buildPageMetadata(20, new URLSearchParams('limit=20&pagina=2'), {
+    defaultLimit: 20, offsetParameter: 'offset', pageParameter: 'pagina'
+  }, 55);
+  assert.equal(meta.page, 2);
+  assert.equal(meta.offset, 20);
+  assert.equal(meta.hasPrevious, true);
+  assert.equal(meta.hasNext, true);
+  assert.equal(meta.previousOffset, 1);
+  assert.equal(meta.nextOffset, 3);
 });
 
 test('pagination infers next page from raw source rows when the total is unknown', () => {
   const fullPage = buildPageMetadata(20, new URLSearchParams('limit=20&offset=0'), { defaultLimit: 20, offsetParameter: 'offset' }, null);
-  const lastPage = buildPageMetadata(7, new URLSearchParams('limit=20&offset=1'), { defaultLimit: 20, offsetParameter: 'offset' }, null);
+  const lastPage = buildPageMetadata(7, new URLSearchParams('limit=20&offset=20'), { defaultLimit: 20, offsetParameter: 'offset' }, null);
   assert.equal(fullPage.hasNext, true);
   assert.equal(lastPage.hasNext, false);
 });

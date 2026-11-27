@@ -95,7 +95,7 @@ const RESOURCE_SECTIONS = {
   vaccination: ['vaccination2025', 'vaccination2026']
 };
 
-const SYSTEM_PARAMETERS = new Set(['limit', 'offset', 'campos']);
+const SYSTEM_PARAMETERS = new Set(['limit', 'offset', 'pagina', 'campos']);
 const BASIC_FILTER_ORDER = {
   cnesEstablishments: ['codigo_uf', 'status'],
   ubs: [],
@@ -167,6 +167,21 @@ function splitQueryFields(resource, schema) {
   const queryFields = (schema?.parameters || []).filter(parameter =>
     parameter.in === 'query' && !SYSTEM_PARAMETERS.has(parameter.name)
   );
+
+  // O ano é um filtro essencial das bases de arboviroses. Algumas versões do
+  // Swagger do Ministério omitem sua definição, embora a API aceite nu_ano.
+  // Mantemos o campo explícito na interface para não depender dessa metadata.
+  if (['dengue', 'zika', 'chikungunya'].includes(resource)
+    && !queryFields.some(parameter => parameter.name === 'nu_ano')) {
+    queryFields.unshift({
+      name: 'nu_ano',
+      in: 'query',
+      type: 'string',
+      required: false,
+      description: 'Ano de referência'
+    });
+  }
+
   const preferred = BASIC_FILTER_ORDER[resource] || queryFields.slice(0, 2).map(parameter => parameter.name);
   const byName = new Map(queryFields.map(parameter => [parameter.name, parameter]));
   const basic = preferred.map(name => byName.get(name)).filter(Boolean);
@@ -206,10 +221,15 @@ function QueryField({ parameter, value, onChange }) {
     ? { '0': 'Inativo', '1': 'Ativo' }
     : ['estabelecimento_possui_centro_cirurgico', 'estabelecimento_possui_centro_obstetrico'].includes(parameter.name)
       ? { '0': 'Não', '1': 'Sim' } : {};
-  const options = isUfCode
-    ? UF_OPTIONS.map(([code, sigla]) => [code, `${sigla} (${code})`])
-    : isUfAcronym ? UF_OPTIONS.map(([, sigla]) => [sigla, sigla])
-      : enumValue?.map(item => [item, enumLabels[item] || item]);
+  const options = parameter.name === 'nu_ano'
+    ? Array.from({ length: Math.max(1, new Date().getFullYear() - 1999) }, (_, index) => {
+      const year = String(new Date().getFullYear() - index);
+      return [year, year];
+    })
+    : isUfCode
+      ? UF_OPTIONS.map(([code, sigla]) => [code, `${sigla} (${code})`])
+      : isUfAcronym ? UF_OPTIONS.map(([, sigla]) => [sigla, sigla])
+        : enumValue?.map(item => [item, enumLabels[item] || item]);
   const inputType = isDateParameter(parameter) ? 'date'
     : ['integer', 'number'].includes(parameter.type) ? 'number' : 'text';
   return <div className="field-wrap" key={`${parameter.in}-${parameter.name}`}>
@@ -504,7 +524,7 @@ function DashboardPage({ onOpenAuth }) {
         <div className="chart-card"><div className="chart-title"><div><span className="eyebrow">COMPARAÇÃO TERRITORIAL</span><h3>Distribuição por UF</h3></div><Globe2 size={18} /></div>{data.analytics.byState?.length ? <ResponsiveContainer width="100%" height={220}><BarChart data={data.analytics.byState}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" /><YAxis /><Tooltip formatter={value => formatNumber(value)} /><Bar dataKey="value" name={data.analytics.measureLabel} fill="#1a7894" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer> : <div className="empty-state chart-empty"><b>Sem dados por UF</b><span>A fonte não trouxe campo territorial reconhecido nesta página.</span></div>}</div>
       </div>}
       {data && <DataTable rows={rows.slice(0, 8)} />}
-      {data?.pagination?.canNavigate && <div className="pagination-controls"><button className="btn-outline-custom" disabled={!data.pagination.hasPrevious || loading} onClick={() => run({ ...params, limit: String(data.pagination.limit), [data.pagination.offsetParameter]: String(data.pagination.previousOffset) })}>Página anterior</button><span>Página {data.pagination.page}</span><button className="btn-outline-custom" disabled={!data.pagination.hasNext || loading} onClick={() => run({ ...params, limit: String(data.pagination.limit), [data.pagination.offsetParameter]: String(data.pagination.nextOffset) })}>Próxima página</button></div>}
+      {data?.pagination?.canNavigate && <div className="pagination-controls"><button className="btn-outline-custom" disabled={!data.pagination.hasPrevious || loading} onClick={() => run({ ...params, limit: String(data.pagination.limit), ...(data.pagination.pageParameter ? { [data.pagination.pageParameter]: String(Math.max(1, data.pagination.page - 1)) } : { [data.pagination.offsetParameter]: String(data.pagination.previousOffset) }) })}>Página anterior</button><span>Página {data.pagination.page}</span><button className="btn-outline-custom" disabled={!data.pagination.hasNext || loading} onClick={() => run({ ...params, limit: String(data.pagination.limit), ...(data.pagination.pageParameter ? { [data.pagination.pageParameter]: String(data.pagination.page + 1) } : { [data.pagination.offsetParameter]: String(data.pagination.nextOffset) }) })}>Próxima página</button></div>}
     </section>
     <div className="dashboard-bottom-grid">
       <div className="info-card"><div className="info-icon"><MapPinned size={19} /></div><div><h3>Visão territorial</h3><p>Localize unidades que possuam coordenadas geográficas válidas na base consultada. Registros sem latitude e longitude permanecem disponíveis na tabela.</p><Link to="/mapa">Abrir mapa interativo <ArrowRight size={14} /></Link></div></div>
@@ -1062,9 +1082,9 @@ function ResourceExplorer({ initialResource, allowedResources, user, onOpenAuth,
         <div className="table-heading"><b>Registros retornados</b><span>{pagination ? `Página ${pagination.page}${pagination.totalRecordsReported !== null ? ` · ${formatNumber(pagination.totalRecordsReported)} registros informados pela fonte` : ''}` : 'Resultado sem paginação documentada'}</span></div>
         <DataTable rows={rows.slice(0, 60)} onRowClick={withMap && !isEpidemiological ? setSelectedFacilityId : undefined} selectedId={selectedFacilityId} />
         {pagination?.canNavigate && <div className="pagination-controls">
-          <button className="btn-outline-custom" disabled={!pagination.hasPrevious || loadingData} onClick={() => run({ ...params, limit: String(pagination.limit), [pagination.offsetParameter]: String(pagination.previousOffset) })}>Página anterior</button>
+          <button className="btn-outline-custom" disabled={!pagination.hasPrevious || loadingData} onClick={() => run({ ...params, limit: String(pagination.limit), ...(pagination.pageParameter ? { [pagination.pageParameter]: String(Math.max(1, pagination.page - 1)) } : { [pagination.offsetParameter]: String(pagination.previousOffset) }) })}>Página anterior</button>
           <span>Página {pagination.page}{pagination.totalRecordsReported !== null ? ` de ${Math.max(1, Math.ceil(pagination.totalRecordsReported / pagination.limit))}` : ''}</span>
-          <button className="btn-outline-custom" disabled={!pagination.hasNext || loadingData} onClick={() => run({ ...params, limit: String(pagination.limit), [pagination.offsetParameter]: String(pagination.nextOffset) })}>Próxima página</button>
+          <button className="btn-outline-custom" disabled={!pagination.hasNext || loadingData} onClick={() => run({ ...params, limit: String(pagination.limit), ...(pagination.pageParameter ? { [pagination.pageParameter]: String(pagination.page + 1) } : { [pagination.offsetParameter]: String(pagination.nextOffset) }) })}>Próxima página</button>
         </div>}
         {pagination && !pagination.canNavigate && <div className="source-footnote">A fonte limita a quantidade por consulta, mas não documenta um parâmetro para avançar entre páginas.</div>}
         <div className="result-provenance">Fonte: {source?.label || resource} · referência {source?.competence || 'não informada'} · {result.elapsedMs} ms · {result.cache?.hit ? 'cache' : 'consulta direta'}.</div>
