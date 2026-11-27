@@ -167,6 +167,21 @@ function splitQueryFields(resource, schema) {
   const queryFields = (schema?.parameters || []).filter(parameter =>
     parameter.in === 'query' && !SYSTEM_PARAMETERS.has(parameter.name)
   );
+
+  // O ano é um filtro essencial das bases de arboviroses. Algumas versões do
+  // Swagger do Ministério omitem sua definição, embora a API aceite nu_ano.
+  // Mantemos o campo explícito na interface para não depender dessa metadata.
+  if (['dengue', 'zika', 'chikungunya'].includes(resource)
+    && !queryFields.some(parameter => parameter.name === 'nu_ano')) {
+    queryFields.unshift({
+      name: 'nu_ano',
+      in: 'query',
+      type: 'string',
+      required: false,
+      description: 'Ano de referência'
+    });
+  }
+
   const preferred = BASIC_FILTER_ORDER[resource] || queryFields.slice(0, 2).map(parameter => parameter.name);
   const byName = new Map(queryFields.map(parameter => [parameter.name, parameter]));
   const basic = preferred.map(name => byName.get(name)).filter(Boolean);
