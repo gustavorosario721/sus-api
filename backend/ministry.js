@@ -229,14 +229,18 @@ export async function fetchResource(resourceId, rawParams = {}) {
     }
   }
 
-  // O endpoint de arboviroses publica dados de notificação em nível individual.
-  // Solicita apenas chaves de agregação permitidas e agrega antes da resposta.
-  if (resource.profile === 'arbovirus' && allowed.has('query:campos')) {
-    const safeFields = ['nu_ano', 'sg_uf', 'id_municip'];
-    const requestedFields = queryParams.get('campos')?.split(',').map(value => value.trim()).filter(Boolean) || [];
-    const unsafe = requestedFields.filter(field => !safeFields.includes(field));
-    if (unsafe.length) throw Object.assign(new Error('A seleção de campos solicitada contém colunas não permitidas para consulta pública.'), { status: 400 });
-    queryParams.set('campos', safeFields.join(','));
+  // Não enviar o parâmetro "campos" aos endpoints de arboviroses: os testes
+  // confirmaram que a API oficial fica sem responder quando esse parâmetro é
+  // utilizado, mesmo com um único campo e limit=100. A proteção de privacidade
+  // permanece no backend: sanitizePublicPayload agrega os registros e só expõe
+  // ano, município, UF e contagens, suprimindo grupos abaixo do mínimo.
+  // Também rejeita "campos" informado pelo cliente para impedir consultas com
+  // colunas arbitrárias na fonte oficial.
+  if (resource.profile === 'arbovirus' && queryParams.has('campos')) {
+    throw Object.assign(
+      new Error('A seleção de campos não está disponível para consultas públicas de arboviroses.'),
+      { status: 400 }
+    );
   }
 
   const path = resource.path.replace(/\{([^}]+)\}/g, (_match, name) => {
