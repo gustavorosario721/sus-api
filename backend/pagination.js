@@ -36,8 +36,8 @@ export function buildPageMetadata(sourcePageCount, params, paging, totalRecordsR
     limit, offset, page, totalRecordsReported: totalRecordsReported ?? null,
     canNavigate, pageParameter,
     hasPrevious: canNavigate && page > 1, hasNext,
-    previousOffset: pageParameter ? Math.max(1, page - 1) : Math.max(0, offset - limit),
-    nextOffset: pageParameter ? page + 1 : offset + limit,
+    previousOffset: !canNavigate ? null : pageParameter ? Math.max(1, page - 1) : Math.max(0, offset - limit),
+    nextOffset: !canNavigate ? null : pageParameter ? page + 1 : offset + limit,
     offsetParameter,
     offsetSemantics: pageParameter
       ? 'Número de página iniciado em 1, conforme a documentação da fonte.'
