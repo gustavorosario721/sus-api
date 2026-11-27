@@ -273,7 +273,7 @@ function useAuth() {
 }
 
 function App() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('healthdata-theme') || 'light');
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
